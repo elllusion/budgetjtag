@@ -1,17 +1,6 @@
 #include <stdio.h>
 #include <budgetjtag.h>
 
-void hexdump(unsigned char *data, int size)
-{
-	int i;
-	for(i = 0; i < size; i++)
-	{
-		printf("0x%02X ", data[i]);
-		if((i + 1) % 8 == 0)
-			putchar('\n');
-	}
-	putchar('\n');
-}
 
 int main()
 {

@@ -47,6 +47,7 @@ int read_from_cable(unsigned char *data, int size)
 	/* To receive data from device 's bulk endpoint
 	 */
 	int actual_length;
+	memset(data, 0x00, 64);
 	int rc = libusb_bulk_transfer(devh, ep_in_addr, data, size, &actual_length,
 								  4000);
 	if (rc == LIBUSB_ERROR_TIMEOUT) {
@@ -107,7 +108,7 @@ int budgetjtag_setup(struct libxsvf_host *h)
 		goto out;
 	}
 	
-	budgetjtag_setmode(BUDGETJTAG_BITSHIFT, 3);
+	budgetjtag_setmode(BUDGETJTAG_BITSHIFT, 2);
 	clear_buf(h);
 	return 0;
 out:
@@ -141,7 +142,7 @@ int budgetjtag_getbyte(struct libxsvf_host *h)
 static int budgetjtag_pulse_tck(struct libxsvf_host *h, int tms, int tdi, int tdo, int rmask, int sync)
 {
 	struct udata_s *v = h->user_data;
-	printf("tdi %d, tms %d, tdo %d, clk %d\n", tdi, tms, tdo, v->clockcount + 1);
+	//printf("tdi %d, tms %d, tdo %d, clk %d\n", tdi, tms, tdo, v->clockcount + 1);
 	tdi = tdi? 1: 0;
 	tdo = tdo? 1: 0;
 	tms = tms? 1: 0;
@@ -152,14 +153,31 @@ static int budgetjtag_pulse_tck(struct libxsvf_host *h, int tms, int tdi, int td
 	v->clockcount++;
 	
 	if(v->clockcount > 255)
-	{
+	{	
 		write_to_cable(v->txbuf, 64);
 		read_from_cable(v->rxbuf, 32);
+		printf("rxbuf\n");
+		hexdump(v->rxbuf, 64);
+		printf("exceptrx\n");
+		hexdump(v->except_rx, 64);	
 		clear_buf(h);
 		v->clockcount = 0;
 	}
 	return 0;
 }
+
+void hexdump(unsigned char *data, int size)
+{
+	int i;
+	for(i = 0; i < size; i++)
+	{
+		printf("0x%02X ", data[i]);
+		if((i + 1) % 8 == 0)
+			putchar('\n');
+	}
+	putchar('\n');
+}
+
 
 static int budgetjtag_sync(struct libxsvf_host *h)
 {
@@ -169,7 +187,8 @@ static int budgetjtag_sync(struct libxsvf_host *h)
 	unsigned char rest_buf[64];
 	unsigned char rest_rx[64];
 	
-	printf("sync: clock %d\n", v->clockcount);
+	
+	//printf("sync: clock %d\n", v->clockcount);
 	if(rest == 0)
 	{ /* 以8位对齐 */
 		write_to_cable(v->txbuf, v->clockcount / 8 * 2);
@@ -181,6 +200,11 @@ static int budgetjtag_sync(struct libxsvf_host *h)
 		{/* 如果大于 8 */
 			write_to_cable(v->txbuf, v->clockcount / 8 * 2);
 			read_from_cable(v->rxbuf, v->clockcount / 8);
+			
+		}
+		else
+		{
+			memset(v->rxbuf, 0x00, 64);
 		}
 		/* 余下部分 */
 		budgetjtag_setmode(BUDGETJTAG_BITBANG, 0);/* 进入 bitbang 模式 TCK TDI TMS，先低后高 */
@@ -195,10 +219,22 @@ static int budgetjtag_sync(struct libxsvf_host *h)
 		}
 		write_to_cable(rest_buf, rest);
 		read_from_cable(rest_rx, rest);
-		budgetjtag_setmode(BUDGETJTAG_BITSHIFT, 3); /* 切换回 bitshift */
+		int lastbyte = 0;
+		for(i = 0; i < rest; i++)
+		{
+			int tdo = rest_rx[i] & 0x10? 1: 0;
+			lastbyte |= tdo << i;
+		}
+		v->rxbuf[v->clockcount / 8] = lastbyte;
+		budgetjtag_setmode(BUDGETJTAG_BITSHIFT, 2); /* 切换回 bitshift */
 		
 				
 	}
+	printf("rxbuf\n");
+	hexdump(v->rxbuf, 64);
+	printf("exceptrx\n");
+	hexdump(v->except_rx, 64);	
+	
 	clear_buf(h);
 	v->clockcount = 0;
 	return 0;
@@ -230,7 +266,11 @@ static void *budgetjtag_realloc(struct libxsvf_host *h, void *ptr, int size, enu
 	return realloc(ptr, size);
 }
 
-
+static int budgetjtag_set_frequency(struct libxsvf_host *h, int v)
+{
+	fprintf(stderr, "WARNING: Setting JTAG clock frequency to %d ignored!\n", v);
+	return 0;
+}
 
 struct libxsvf_host budgetjtag = {
 	.udelay = budgetjtag_udelay,
@@ -241,7 +281,7 @@ struct libxsvf_host budgetjtag = {
 	.sync = budgetjtag_sync,
 	.pulse_sck = NULL,
 	.set_trst = NULL,
-	.set_frequency = NULL,
+	.set_frequency = budgetjtag_set_frequency,
 	.report_tapstate = NULL,
 	.report_device = NULL,
 	.report_status = budgetjtag_report_status,
