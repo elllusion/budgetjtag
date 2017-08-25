@@ -15,10 +15,15 @@ Features
 ===
 
 -[x] USB to JTAG bridge
+
 -[]  USB to UART bridge
+
 -[]  USB to SPI bridge
+
 -[]  USB to GPIO bridge
+
 -[]  USB to I2C bridge
+
 -[]  USB Flash/EEPROM programmer
 
 Dependencies
