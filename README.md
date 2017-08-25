@@ -29,3 +29,7 @@ libxsvf by Clifford Wolf
 libopencm3 by The LibOpenCM3 team
 
 
+License
+===
+
+Hardware and software is covered by MIT license.
