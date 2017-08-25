@@ -135,5 +135,7 @@ int libxsvf_tap_walk(struct libxsvf_host *, enum libxsvf_tap_state);
 #define LIBXSVF_HOST_REPORT_ERROR(_msg) h->report_error(h, __FILE__, __LINE__, _msg)
 #define LIBXSVF_HOST_REALLOC(_ptr, _size, _which) h->realloc(h, _ptr, _size, _which)
 
+#define LIBXSVF_WITHOUT_XSVF
+#define LIBXSVF_WITHOUT_SCAN
 #endif
 
